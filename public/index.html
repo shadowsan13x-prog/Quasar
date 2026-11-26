@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#090d18">
+<title>QUASAR MESSENGER</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#090d18;color:#edf2ff;font-family:Arial,sans-serif}
+main{max-width:850px;margin:auto;padding:22px}
+header{padding:22px 0;border-bottom:1px solid #253149;margin-bottom:24px}
+h1{font-size:25px;margin:0;color:#a8c7ff}
+.sub{color:#8392ae;font-size:13px;margin-top:9px}
+.card{background:#111a2b;border:1px solid #263651;border-radius:15px;padding:18px;margin-bottom:16px}
+h2{font-size:17px;margin:0 0 16px}
+label{display:block;margin:13px 0 8px;color:#b9c7df;font-size:14px}
+input,textarea{width:100%;background:#091222;color:white;border:1px solid #31425f;border-radius:9px;padding:13px;font:inherit}
+textarea{min-height:105px;resize:vertical}
+button{border:0;border-radius:9px;padding:12px 18px;background:#477ef5;color:white;font-weight:bold;font-size:14px;cursor:pointer}
+button.secondary{background:#263651}
+button.danger{background:#9c394b}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:15px}
+.status{display:inline-block;border-radius:20px;padding:7px 12px;background:#263651;color:#b9c7df;font-size:12px}
+.status.on{background:#174a39;color:#8df0bd}
+.group{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #263149}
+.group input{width:18px;height:18px}
+.muted{color:#8594ad;font-size:13px;line-height:1.7}
+#dashboard{display:none}
+#login{max-width:430px;margin:65px auto}
+#activity{max-height:260px;overflow:auto}
+.entry{padding:10px;border-bottom:1px solid #263149;font-size:13px}
+small{color:#8594ad}
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>⚛ QUASAR MESSENGER</h1>
+<div class="sub">Automatic Group Reply Dashboard</div>
+</header>
+
+<section id="login" class="card">
+<h2>دخول لوحة التحكم</h2>
+<label>كلمة مرور لوحة الموقع</label>
+<input id="password" type="password" placeholder="أدخل كلمة المرور">
+<div class="actions">
+<button onclick="login()">تسجيل الدخول</button>
+</div>
+<p id="loginError" class="muted"></p>
+</section>
+
+<section id="dashboard">
+<div class="card">
+<h2>بيانات ربط Messenger</h2>
+<label>البريد الإلكتروني أو رقم الهاتف أو ID</label>
+<input id="messengerEmail" type="text" autocomplete="off" placeholder="أدخل البريد أو رقم الهاتف أو معرّف الحساب">
+<label>كلمة المرور</label>
+<input id="messengerPassword" type="password" autocomplete="new-password" placeholder="أدخل كلمة المرور">
+<label>Cookie</label>
+<textarea id="messengerCookie" rows="5" autocomplete="off" placeholder="الصق Cookie هنا"></textarea>
+<p class="muted">يمكنك إدخال البريد أو رقم الهاتف أو ID مع كلمة المرور، أو استخدام Cookie. عند إدخال Cookie ستكون لها الأولوية.</p>
+<div class="actions">
+<button onclick="connectMessenger()">اتصال بـ Messenger</button>
+</div>
+<p id="connectionResult" class="muted"></p>
+<a id="checkpointLink"
+   href="https://www.facebook.com/checkpoint/"
+   target="_blank"
+   rel="noopener noreferrer"
+   hidden>فتح صفحة تأكيد الحساب الرسمية في Facebook</a>
+</div>
+
+<div class="card">
+<h2>حالة الحساب</h2>
+<div id="connection" class="status">غير متصل</div>
+<p class="muted">سيظهر اتصال Messenger بعد إعداد واختبار موصل الحساب.</p>
+</div>
+
+<div class="card">
+<h2>إعدادات الرد التلقائي</h2>
+<label>رسالة الرد الثابتة</label>
+<textarea id="message" placeholder="اكتب أو الصق رسالتك كاملة هنا..."></textarea>
+<label>تأخير الرد بالثواني</label>
+<input id="delay" type="number" min="5" max="3600" value="5">
+<label class="group">
+<input id="enabled" type="checkbox">
+تفعيل الرد التلقائي
+</label>
+<p class="muted">لن يتم تفعيل الرد قبل اختيار قروب واحد على الأقل.</p>
+</div>
+
+<div class="card">
+<h2>قروبات Messenger</h2>
+<p class="muted">ستظهر هنا أسماء القروبات بعد نجاح ربط الحساب.</p>
+<div id="groups"><p class="muted">لم يتم تحميل القروبات بعد.</p></div>
+<button class="secondary" onclick="loadStatus()">تحديث القائمة</button>
+</div>
+
+<div class="card">
+<h2>حفظ الإعدادات</h2>
+<div class="actions">
+<button onclick="saveSettings()">حفظ الإعدادات</button>
+<button class="secondary" onclick="logout()">تسجيل الخروج</button>
+</div>
+<p id="result" class="muted"></p>
+</div>
+
+<div class="card">
+<h2>سجل النشاط</h2>
+<div id="activity" class="muted">لا يوجد نشاط حتى الآن.</div>
+</div>
+</section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let groups = [];
+let selected = [];
+
+async function api(url, options={}) {
+  const r = await fetch(url, {
+    ...options,
+    headers: {'Content-Type':'application/json',...(options.headers||{})}
+  });
+  const contentType = r.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error(`السيرفر أعاد صفحة HTML بدل JSON (HTTP ${r.status}).`);
+  }
+  const data = await r.json();
+  if (!r.ok) {
+    const error = new Error(data.error || 'حدث خطأ');
+    error.code = data.code || "UNKNOWN";
+    throw error;
+  }
+  return data;
+}
+
+async function login(){
+  try{
+    await api('/api/login',{method:'POST',body:JSON.stringify({password:$('password').value})});
+    $('login').style.display='none';
+    $('dashboard').style.display='block';
+    $('loginError').textContent='';
+    await loadStatus();
+  }catch(e){$('loginError').textContent=e.message}
+}
+
+async function connectMessenger(){
+  const email = $('messengerEmail').value.trim();
+  const password = $('messengerPassword').value;
+  const cookie = $('messengerCookie').value.trim();
+
+  if (!cookie && (!email || !password)) {
+    $('connectionResult').textContent =
+      'أدخل البريد أو رقم الهاتف أو ID مع كلمة المرور، أو الصق Cookie.';
+    return;
+  }
+
+  $('connectionResult').textContent = 'جارٍ الاتصال...';
+  $('checkpointLink').hidden = true;
+
+  try {
+    await api('/api/connect', {
+      method: 'POST',
+      body: JSON.stringify({ identifier: email, password, cookie })
+    });
+
+    $('connectionResult').textContent = 'تم الاتصال بنجاح.';
+    $('messengerPassword').value = '';
+    $('messengerCookie').value = '';
+    await loadStatus();
+  } catch (e) {
+    $('connectionResult').textContent = e.message;
+
+    if (e.code === 'CHECKPOINT') {
+      $('checkpointLink').hidden = false;
+    }
+  }
+}
+
+async function loadStatus(){
+  try{
+    const d=await api('/api/status');
+    groups=d.groups;
+    selected=d.selectedGroups;
+    $('message').value=d.message;
+    $('delay').value=d.delay;
+    $('enabled').checked=d.enabled;
+    $('connection').textContent=d.connected?'متصل':'غير متصل';
+    $('connection').className='status'+(d.connected?' on':'');
+    renderGroups();
+    $('activity').innerHTML=d.activity.length
+      ?d.activity.map(x=>'<div class="entry">'+escapeHtml(x.message||'نشاط')+'</div>').join('')
+      :'لا يوجد نشاط حتى الآن.';
+  }catch(e){
+    if(e.message==='غير مسجل الدخول'){
+      $('dashboard').style.display='none';
+      $('login').style.display='block';
+    }
+  }
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderGroups(){
+  $('groups').innerHTML=groups.length
+    ?groups.map(g=>`<label class="group"><input type="checkbox" value="${escapeHtml(g.id)}" ${selected.includes(g.id)?'checked':''} onchange="toggleGroup(this)"> ${escapeHtml(g.name)}</label>`).join('')
+    :'<p class="muted">لم يتم تحميل القروبات بعد.</p>';
+}
+
+function toggleGroup(el){
+  if(el.checked){if(!selected.includes(el.value))selected.push(el.value)}
+  else selected=selected.filter(x=>x!==el.value);
+}
+
+async function saveSettings(){
+  try{
+    const d=await api('/api/start',{
+      method:'POST',
+      body:JSON.stringify({
+        message:$('message').value,
+        delay:Number($('delay').value),
+        enabled:$('enabled').checked,
+        selectedGroups:selected
+      })
+    });
+    $('result').textContent=d.success?'تم حفظ الإعدادات.':'تعذر الحفظ';
+  }catch(e){$('result').textContent=e.message}
+}
+
+async function logout(){
+  await api('/api/logout',{method:'POST'});
+  location.reload();
+}
+
+api('/api/status').then(()=>{ $('login').style.display='none';$('dashboard').style.display='block';loadStatus() }).catch(()=>{});
+</script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+node_modules/
+.env
+sessions/
+data/
+*.log
+
+# Messenger account secrets and session files
+fca-config.json
+appstate*.json
+cookie*.txt
+appState*.json
+sessions/
+data/
+
+# Local Messenger credentials
+.quasar-messenger/
+fca-appstate.json
+
+# Private credentials and local runtime files
+fca-config.json
+config.json
+.env
+.env.*
+!.env.example
+server.log
+server.pid
+*.log
+*.pid
+cookie*
+*cookie*
+*appstate*
+*appState*
+*.tar.gz
+*.zip
+*.bak
+*.bak.*
+*.before-*
+*-before-*
+.quasar-messenger/
